@@ -149,13 +149,21 @@ function QuestionProcessor() {
   const [loadingSuggestionIndex, setLoadingSuggestionIndex] = useState(null);
   const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(null);
 
+  const getServerUrl = () => {
+    let serverUrl = process.env.REACT_APP_SERVER_URL;
+    if (serverUrl && !serverUrl.startsWith("http")) {
+      const protocol = serverUrl.includes("localhost") ? "http" : "https";
+      serverUrl = `${protocol}://${serverUrl}`;
+    }
+    return serverUrl;
+  };
+
   const fetchSuggestedQuestions = async () => {
     setSuggestedQuestionsLoading(true);
     setSuggestedQuestionsError("");
 
     try {
-      const serverUrl =
-        process.env.REACT_APP_SERVER_URL || "http://localhost:3001";
+      const serverUrl = getServerUrl();
       const res = await fetch(`${serverUrl}/get-suggested-questions`);
 
       if (!res.ok) {
@@ -193,8 +201,7 @@ function QuestionProcessor() {
     setError("");
 
     try {
-      const serverUrl =
-        process.env.REACT_APP_SERVER_URL || "http://localhost:3001";
+      const serverUrl = getServerUrl();
       const res = await fetch(`${serverUrl}/process-question`, {
         method: "POST",
         headers: {
@@ -228,16 +235,13 @@ function QuestionProcessor() {
   };
 
   const handleSuggestedQuestionClick = async (selectedQuestion, index) => {
-    // Don't set the question text in the input field
-
     // Set selected and loading state for this specific suggestion
     setSelectedQuestionIndex(index);
     setLoadingSuggestionIndex(index);
     setError("");
 
     try {
-      const serverUrl =
-        process.env.REACT_APP_SERVER_URL || "http://localhost:3001";
+      const serverUrl = getServerUrl();
       const res = await fetch(`${serverUrl}/process-question`, {
         method: "POST",
         headers: {
