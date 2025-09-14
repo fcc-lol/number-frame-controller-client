@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import FrameSimulator from "./FrameSimulator";
 
 const Page = styled.div`
   display: flex;
@@ -27,18 +29,6 @@ const TextInput = styled.input`
     border-color: #007bff;
     box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
   }
-`;
-
-const ResponseContainer = styled.div`
-  width: 100%;
-  min-height: 100px;
-  padding: 16px;
-  background-color: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  font-size: 16px;
-  color: #495057;
-  white-space: pre-wrap;
 `;
 
 const LoadingText = styled.div`
@@ -93,9 +83,8 @@ const QuestionItem = styled.button`
   }
 `;
 
-function App() {
+function QuestionProcessor() {
   const [question, setQuestion] = useState("");
-  const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [suggestedQuestions, setSuggestedQuestions] = useState([]);
@@ -140,7 +129,6 @@ function App() {
 
     setLoading(true);
     setError("");
-    setResponse("");
 
     try {
       const serverUrl =
@@ -159,8 +147,9 @@ function App() {
         throw new Error(`Server error: ${res.status} ${res.statusText}`);
       }
 
+      // eslint-disable-next-line no-unused-vars
       const data = await res.json();
-      setResponse(data.number);
+      // Process response but don't update suggested questions to avoid reload
     } catch (err) {
       setError(`Failed to send question: ${err.message}`);
     } finally {
@@ -180,7 +169,6 @@ function App() {
     // Immediately submit the question
     setLoading(true);
     setError("");
-    setResponse("");
 
     try {
       const serverUrl =
@@ -199,8 +187,10 @@ function App() {
         throw new Error(`Server error: ${res.status} ${res.statusText}`);
       }
 
+      // eslint-disable-next-line no-unused-vars
       const data = await res.json();
-      setResponse(data.number);
+      // Don't update suggested questions when clicking a suggested question
+      // This prevents the list from reloading/changing
     } catch (err) {
       setError(`Failed to send question: ${err.message}`);
     } finally {
@@ -247,18 +237,24 @@ function App() {
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         onKeyPress={handleKeyPress}
+        disabled={loading}
       />
-      <ResponseContainer>
-        {loading && <LoadingText>Sending question...</LoadingText>}
-        {error && <ErrorText>{error}</ErrorText>}
-        {response !== "" && !loading && !error && response}
-        {!loading &&
-          !error &&
-          response === "" &&
-          "Response will appear here..."}
-      </ResponseContainer>
+
+      {loading && <LoadingText>Processing your question...</LoadingText>}
+      {error && <ErrorText>{error}</ErrorText>}
     </Page>
   );
 }
 
-export default App;
+function MobileController() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<QuestionProcessor />} />
+        <Route path="/frame-simulator" element={<FrameSimulator />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default MobileController;
