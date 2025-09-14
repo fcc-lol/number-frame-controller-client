@@ -6,91 +6,148 @@ import FrameSimulator from "./FrameSimulator";
 const Page = styled.div`
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  height: 100vh;
-  font-size: 24px;
-  color: #333;
-  padding: 20px;
-  max-width: 600px;
+  font-size: 1.5rem;
+  padding: 1.25rem;
+  max-width: 37.5rem;
   margin: 0 auto;
+  gap: 1.25rem;
 `;
 
-const TextInput = styled.input`
-  width: 100%;
-  padding: 12px 16px;
-  font-size: 16px;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  outline: none;
-  margin-bottom: 20px;
+const TextInput = styled.textarea`
+  width: calc(100% - 2.5rem);
+  padding: 1rem 1.25rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: 1rem;
+  font-size: 2rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 1);
+  text-align: left;
+  min-height: 8rem;
+  resize: none;
+  font-family: inherit;
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+    font-weight: 400;
+  }
 
   &:focus {
-    border-color: #007bff;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    outline: none;
   }
-`;
 
-const LoadingText = styled.div`
-  color: #6c757d;
-  font-style: italic;
-`;
-
-const ErrorText = styled.div`
-  color: #dc3545;
-`;
-
-const SuggestedQuestionsContainer = styled.div`
-  width: 100%;
-  margin-bottom: 20px;
-`;
-
-const SuggestedQuestionsTitle = styled.h3`
-  margin-bottom: 12px;
-  color: #495057;
-  font-size: 18px;
-`;
-
-const QuestionsList = styled.div`
-  display: grid;
-  gap: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 8px;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
+  &:disabled {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.1);
+  }
 `;
 
 const QuestionItem = styled.button`
-  padding: 8px 12px;
-  background-color: #ffffff;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-  font-size: 14px;
-  color: #495057;
+  padding: 1rem 1.25rem;
+  background-color: ${(props) =>
+    props.selected ? "rgba(255, 255, 255, 0.4)" : "rgba(255, 255, 255, 0.1)"};
+  border: none;
+  border-radius: 1rem;
+  font-size: 2rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 1);
   text-align: left;
   cursor: pointer;
   transition: all 0.2s ease;
+  width: 100%;
+  position: relative;
+  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
+  pointer-events: ${(props) => (props.disabled ? "none" : "auto")};
 
-  &:hover {
-    background-color: #e9ecef;
-    border-color: #adb5bd;
+  @media (hover: hover) {
+    &:hover {
+      background-color: ${(props) => {
+        if (props.disabled) return "rgba(255, 255, 255, 0.1)";
+        if (props.selected) return "rgba(255, 255, 255, 0.4)";
+        return "rgba(255, 255, 255, 0.2)";
+      }};
+    }
   }
 
   &:active {
-    background-color: #dee2e6;
+    background-color: ${(props) => {
+      if (props.disabled) return "rgba(255, 255, 255, 0.1)";
+      if (props.selected) return "rgba(255, 255, 255, 0.4)";
+      return "rgba(255, 255, 255, 0.2)";
+    }};
   }
+`;
+
+const QuestionText = styled.span.withConfig({
+  shouldForwardProp: (prop) => prop !== "isLoading"
+})`
+  opacity: ${(props) => (props.isLoading ? 0 : 1)};
+  transition: opacity 0.2s ease;
+`;
+
+const SpinnerOverlay = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== "show"
+})`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: ${(props) => (props.show ? "block" : "none")};
+`;
+
+const Spinner = styled.div`
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 5px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: rgba(255, 255, 255, 0.8);
+  animation: spin 1s ease-in-out infinite;
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`;
+
+const SpinnerWithMargin = styled.div`
+  margin-top: 2rem;
+  display: flex;
+  justify-content: center;
+`;
+
+const TextAreaContainer = styled.div`
+  position: relative;
+  width: 100%;
+`;
+
+const TextAreaOverlay = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== "show"
+})`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 1rem;
+  display: ${(props) => (props.show ? "flex" : "none")};
+  align-items: center;
+  justify-content: center;
 `;
 
 function QuestionProcessor() {
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
   const [suggestedQuestions, setSuggestedQuestions] = useState([]);
   const [suggestedQuestionsLoading, setSuggestedQuestionsLoading] =
     useState(false);
   const [suggestedQuestionsError, setSuggestedQuestionsError] = useState("");
+  const [loadingSuggestionIndex, setLoadingSuggestionIndex] = useState(null);
+  const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(null);
 
   const fetchSuggestedQuestions = async () => {
     setSuggestedQuestionsLoading(true);
@@ -107,11 +164,16 @@ function QuestionProcessor() {
 
       const data = await res.json();
       if (data.success && data.questions) {
-        setSuggestedQuestions(data.questions);
+        // Clean up questions by removing trailing commas and whitespace
+        const cleanedQuestions = data.questions.map((question) =>
+          question.trim().replace(/,+$/, "")
+        );
+        setSuggestedQuestions(cleanedQuestions);
       } else {
         throw new Error("Invalid response format");
       }
     } catch (err) {
+      console.error("Failed to load suggested questions:", err.message);
       setSuggestedQuestionsError(
         `Failed to load suggested questions: ${err.message}`
       );
@@ -151,23 +213,26 @@ function QuestionProcessor() {
       const data = await res.json();
       // Process response but don't update suggested questions to avoid reload
     } catch (err) {
+      console.error("Failed to send question:", err.message);
       setError(`Failed to send question: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyDown = (e) => {
     if (e.key === "Enter") {
+      e.preventDefault();
       handleSubmit();
     }
   };
 
-  const handleSuggestedQuestionClick = async (selectedQuestion) => {
-    setQuestion(selectedQuestion);
+  const handleSuggestedQuestionClick = async (selectedQuestion, index) => {
+    // Don't set the question text in the input field
 
-    // Immediately submit the question
-    setLoading(true);
+    // Set selected and loading state for this specific suggestion
+    setSelectedQuestionIndex(index);
+    setLoadingSuggestionIndex(index);
     setError("");
 
     try {
@@ -192,56 +257,61 @@ function QuestionProcessor() {
       // Don't update suggested questions when clicking a suggested question
       // This prevents the list from reloading/changing
     } catch (err) {
+      console.error("Failed to send question:", err.message);
       setError(`Failed to send question: ${err.message}`);
     } finally {
-      setLoading(false);
+      setLoadingSuggestionIndex(null);
     }
   };
 
   return (
     <Page>
-      <h1>Question Processor</h1>
+      <TextAreaContainer>
+        <TextInput
+          placeholder="Ask a question..."
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={loading}
+        />
+        <TextAreaOverlay show={loading}>
+          <Spinner />
+        </TextAreaOverlay>
+      </TextAreaContainer>
 
       {/* Suggested Questions Section */}
-      <SuggestedQuestionsContainer>
-        <SuggestedQuestionsTitle>Suggested Questions</SuggestedQuestionsTitle>
-        <QuestionsList>
-          {suggestedQuestionsLoading && (
-            <LoadingText>Loading suggested questions...</LoadingText>
-          )}
-          {suggestedQuestionsError && (
-            <ErrorText>{suggestedQuestionsError}</ErrorText>
-          )}
-          {!suggestedQuestionsLoading &&
-            !suggestedQuestionsError &&
-            suggestedQuestions.length > 0 &&
-            suggestedQuestions.map((suggestedQuestion, index) => (
-              <QuestionItem
-                key={index}
-                onClick={() => handleSuggestedQuestionClick(suggestedQuestion)}
-              >
+      {suggestedQuestionsLoading && (
+        <SpinnerWithMargin>
+          <Spinner />
+        </SpinnerWithMargin>
+      )}
+      {!suggestedQuestionsLoading &&
+        !suggestedQuestionsError &&
+        suggestedQuestions.length > 0 &&
+        suggestedQuestions.map((suggestedQuestion, index) => {
+          const isCurrentlyLoading = loadingSuggestionIndex === index;
+          const isAnyLoading = loadingSuggestionIndex !== null;
+          const shouldBeDisabled = isAnyLoading && !isCurrentlyLoading;
+          const isSelected = selectedQuestionIndex === index;
+
+          return (
+            <QuestionItem
+              key={index}
+              onClick={() =>
+                handleSuggestedQuestionClick(suggestedQuestion, index)
+              }
+              disabled={shouldBeDisabled}
+              selected={isSelected}
+            >
+              <QuestionText isLoading={isCurrentlyLoading}>
                 {suggestedQuestion}
-              </QuestionItem>
-            ))}
-          {!suggestedQuestionsLoading &&
-            !suggestedQuestionsError &&
-            suggestedQuestions.length === 0 && (
-              <LoadingText>No suggested questions available</LoadingText>
-            )}
-        </QuestionsList>
-      </SuggestedQuestionsContainer>
-
-      <TextInput
-        type="text"
-        placeholder="Enter your question and press Enter..."
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        onKeyPress={handleKeyPress}
-        disabled={loading}
-      />
-
-      {loading && <LoadingText>Processing your question...</LoadingText>}
-      {error && <ErrorText>{error}</ErrorText>}
+              </QuestionText>
+              <SpinnerOverlay show={isCurrentlyLoading}>
+                <Spinner />
+              </SpinnerOverlay>
+            </QuestionItem>
+          );
+        })}
     </Page>
   );
 }
