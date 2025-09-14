@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import FrameSimulator from "./FrameSimulator";
@@ -58,7 +58,7 @@ const QuestionItem = styled.button`
   transition: all 0.2s ease;
   width: 100%;
   position: relative;
-  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
+  opacity: ${(props) => (props.disabled ? 0.6 : 1)};
   pointer-events: ${(props) => (props.disabled ? "none" : "auto")};
 
   @media (hover: hover) {
@@ -75,7 +75,7 @@ const QuestionItem = styled.button`
     background-color: ${(props) => {
       if (props.disabled) return "rgba(255, 255, 255, 0.1)";
       if (props.selected) return "rgba(255, 255, 255, 0.4)";
-      return "rgba(255, 255, 255, 0.2)";
+      return "rgba(255, 255, 255, 0.4)";
     }};
   }
 `;
@@ -158,7 +158,7 @@ function QuestionProcessor() {
     return serverUrl;
   };
 
-  const fetchSuggestedQuestions = async () => {
+  const fetchSuggestedQuestions = useCallback(async () => {
     setSuggestedQuestionsLoading(true);
     setSuggestedQuestionsError("");
 
@@ -188,11 +188,11 @@ function QuestionProcessor() {
     } finally {
       setSuggestedQuestionsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchSuggestedQuestions();
-  }, []);
+  }, [fetchSuggestedQuestions]);
 
   const handleSubmit = async () => {
     if (!question.trim()) return;
@@ -276,7 +276,7 @@ function QuestionProcessor() {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={loading}
+          disabled={loading || loadingSuggestionIndex !== null}
         />
         <TextAreaOverlay show={loading}>
           <Spinner />
