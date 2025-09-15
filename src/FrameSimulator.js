@@ -152,8 +152,7 @@ function FrameSimulator() {
 
   useEffect(() => {
     // Connect to the socket server
-    const serverUrl =
-      process.env.REACT_APP_SERVER_URL || "http://localhost:3001";
+    const serverUrl = process.env.REACT_APP_SERVER_URL;
 
     // Add protocol prefix if not present
     let socketUrl = serverUrl;
