@@ -79,13 +79,6 @@ const QuestionItem = styled.button`
   }
 `;
 
-const QuestionText = styled.span.withConfig({
-  shouldForwardProp: (prop) => prop !== "isLoading"
-})`
-  opacity: ${(props) => (props.isLoading ? 0 : 1)};
-  transition: opacity 0.2s ease;
-`;
-
 // eslint-disable-next-line no-unused-vars
 const SpinnerOverlay = styled.div.withConfig({
   shouldForwardProp: (prop) => prop !== "show"
@@ -488,9 +481,7 @@ function QuestionProcessor() {
           }
           selected={selectedQuestionIndex === 0}
         >
-          <QuestionText isLoading={loadingSuggestionIndex === 0}>
-            {currentQuestion.question}
-          </QuestionText>
+          {currentQuestion.question}
           {/* <SpinnerOverlay show={loadingSuggestionIndex === 0}>
             <Spinner />
           </SpinnerOverlay> */}
@@ -515,9 +506,7 @@ function QuestionProcessor() {
               disabled={shouldBeDisabled}
               selected={isSelected}
             >
-              <QuestionText isLoading={isCurrentlyLoading}>
-                {historyQuestion}
-              </QuestionText>
+              {historyQuestion}
               {/* <SpinnerOverlay show={isCurrentlyLoading}>
                 <Spinner />
               </SpinnerOverlay> */}
@@ -551,9 +540,7 @@ function QuestionProcessor() {
               disabled={shouldBeDisabled}
               selected={isSelected}
             >
-              <QuestionText isLoading={isCurrentlyLoading}>
-                {suggestedQuestion}
-              </QuestionText>
+              {suggestedQuestion}
               {/* <SpinnerOverlay show={isCurrentlyLoading}>
                 <Spinner />
               </SpinnerOverlay> */}
