@@ -58,7 +58,6 @@ const QuestionItem = styled.button`
   transition: all 0.2s ease;
   width: 100%;
   position: relative;
-  opacity: ${(props) => (props.disabled ? 0.6 : 1)};
   pointer-events: ${(props) => (props.disabled ? "none" : "auto")};
 
   @media (hover: hover) {
@@ -148,6 +147,8 @@ function QuestionProcessor() {
   const [suggestedQuestionsError, setSuggestedQuestionsError] = useState("");
   const [loadingSuggestionIndex, setLoadingSuggestionIndex] = useState(null);
   const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(null);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [questionHistory, setQuestionHistory] = useState([]);
 
   const getServerUrl = () => {
     let serverUrl = process.env.REACT_APP_SERVER_URL;
@@ -157,6 +158,33 @@ function QuestionProcessor() {
     }
     return serverUrl;
   };
+
+  const fetchCurrentQuestion = useCallback(async () => {
+    try {
+      const serverUrl = getServerUrl();
+      const res = await fetch(`${serverUrl}/get-current-question`);
+
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      if (data.success && data.question) {
+        setCurrentQuestion({
+          question: data.question,
+          number: data.number,
+          answerSource: data.answerSource,
+          timestamp: data.timestamp
+        });
+        // Mark the current question as selected (index 0 since it's first)
+        setSelectedQuestionIndex(0);
+      } else {
+        throw new Error("Invalid response format");
+      }
+    } catch (err) {
+      // Silently handle fetch errors
+    }
+  }, []);
 
   const fetchSuggestedQuestions = useCallback(async () => {
     setSuggestedQuestionsLoading(true);
@@ -181,7 +209,6 @@ function QuestionProcessor() {
         throw new Error("Invalid response format");
       }
     } catch (err) {
-      console.error("Failed to load suggested questions:", err.message);
       setSuggestedQuestionsError(
         `Failed to load suggested questions: ${err.message}`
       );
@@ -191,8 +218,108 @@ function QuestionProcessor() {
   }, []);
 
   useEffect(() => {
+    fetchCurrentQuestion();
     fetchSuggestedQuestions();
-  }, [fetchSuggestedQuestions]);
+  }, [fetchCurrentQuestion, fetchSuggestedQuestions]);
+
+  // WebSocket setup for listening to number-update events
+  useEffect(() => {
+    const serverUrl = process.env.REACT_APP_SERVER_URL;
+
+    // Convert HTTP URL to WebSocket URL
+    let websocketUrl = serverUrl;
+    if (
+      !websocketUrl.startsWith("ws://") &&
+      !websocketUrl.startsWith("wss://")
+    ) {
+      // Remove any existing http/https prefix
+      websocketUrl = websocketUrl.replace(/^https?:\/\//, "");
+      // Use wss for production, ws for localhost
+      const protocol = websocketUrl.includes("localhost") ? "ws://" : "wss://";
+      websocketUrl = protocol + websocketUrl;
+    }
+
+    const websocket = new WebSocket(websocketUrl);
+
+    websocket.onopen = () => {
+      // Connected to WebSocket server
+    };
+
+    websocket.onclose = (event) => {
+      // If the connection was closed by the server (not by us), attempt to reconnect
+      if (event.code !== 1000 && event.code !== 1001) {
+        setTimeout(() => {
+          // Create new connection by triggering this useEffect again would require state change
+          // For now, just handle that we detected an unexpected disconnection
+        }, 3000);
+      }
+    };
+
+    websocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        // Handle number-update events with question data
+        if (data.type === "number-update") {
+          // Update current question from socket event if question data is provided
+          if (data.question) {
+            // Only update current question and selection if no question is selected,
+            // or if the current question is already selected
+            setSelectedQuestionIndex((prev) => {
+              const shouldUpdateCurrent = prev === null || prev === 0;
+
+              if (shouldUpdateCurrent) {
+                // Add the existing current question to history before replacing it
+                setCurrentQuestion((currentQ) => {
+                  if (
+                    currentQ &&
+                    currentQ.question &&
+                    currentQ.question !== data.question
+                  ) {
+                    setQuestionHistory((prevHistory) => {
+                      // Check if this question already exists in history (avoid duplicates)
+                      if (
+                        prevHistory.some(
+                          (q) =>
+                            q.toLowerCase() === currentQ.question.toLowerCase()
+                        )
+                      ) {
+                        return prevHistory;
+                      }
+                      // Add previous current question to the beginning of history
+                      return [currentQ.question, ...prevHistory];
+                    });
+                  }
+
+                  // Return the new current question
+                  return {
+                    question: data.question,
+                    number: data.number || null, // Handle missing number field
+                    answerSource: data.answerSource || null,
+                    timestamp: data.timestamp
+                  };
+                });
+                return 0; // Set to current question
+              }
+
+              return prev; // Keep existing selection
+            });
+          }
+        }
+      } catch (error) {
+        // Silently handle WebSocket message parsing errors
+      }
+    };
+
+    websocket.onerror = (error) => {
+      // Silently handle WebSocket connection errors
+    };
+
+    // Cleanup on unmount
+    return () => {
+      websocket.close();
+    };
+  }, []); // Remove fetchCurrentQuestion dependency to prevent unnecessary reconnections
 
   const handleSubmit = async () => {
     if (!question.trim()) return;
@@ -219,8 +346,10 @@ function QuestionProcessor() {
       // eslint-disable-next-line no-unused-vars
       const data = await res.json();
       // Process response but don't update suggested questions to avoid reload
+
+      // Clear the text field after successful submission
+      setQuestion("");
     } catch (err) {
-      console.error("Failed to send question:", err.message);
       setError(`Failed to send question: ${err.message}`);
     } finally {
       setLoading(false);
@@ -261,7 +390,73 @@ function QuestionProcessor() {
       // Don't update suggested questions when clicking a suggested question
       // This prevents the list from reloading/changing
     } catch (err) {
-      console.error("Failed to send question:", err.message);
+      setError(`Failed to send question: ${err.message}`);
+    } finally {
+      setLoadingSuggestionIndex(null);
+    }
+  };
+
+  const handleHistoryQuestionClick = async (historyQuestion, index) => {
+    // Calculate the adjusted index for history items (right after current question)
+    const adjustedIndex = 1 + index; // History starts at index 1 (after current question at 0)
+
+    // Set selected and loading state for this history item
+    setSelectedQuestionIndex(adjustedIndex);
+    setLoadingSuggestionIndex(adjustedIndex);
+    setError("");
+
+    try {
+      const serverUrl = getServerUrl();
+      const res = await fetch(`${serverUrl}/process-question`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          question: historyQuestion.trim()
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      }
+
+      // eslint-disable-next-line no-unused-vars
+      const data = await res.json();
+    } catch (err) {
+      setError(`Failed to send question: ${err.message}`);
+    } finally {
+      setLoadingSuggestionIndex(null);
+    }
+  };
+
+  const handleCurrentQuestionClick = async () => {
+    if (!currentQuestion) return;
+
+    // Set selected and loading state for the current question (index 0)
+    setSelectedQuestionIndex(0);
+    setLoadingSuggestionIndex(0);
+    setError("");
+
+    try {
+      const serverUrl = getServerUrl();
+      const res = await fetch(`${serverUrl}/process-question`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          question: currentQuestion.question.trim()
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      }
+
+      // eslint-disable-next-line no-unused-vars
+      const data = await res.json();
+    } catch (err) {
       setError(`Failed to send question: ${err.message}`);
     } finally {
       setLoadingSuggestionIndex(null);
@@ -283,6 +478,52 @@ function QuestionProcessor() {
         </TextAreaOverlay>
       </TextAreaContainer>
 
+      {/* Current Question Section */}
+      {currentQuestion && (
+        <QuestionItem
+          onClick={handleCurrentQuestionClick}
+          disabled={
+            loadingSuggestionIndex !== null && loadingSuggestionIndex !== 0
+          }
+          selected={selectedQuestionIndex === 0}
+        >
+          <QuestionText isLoading={loadingSuggestionIndex === 0}>
+            {currentQuestion.question}
+          </QuestionText>
+          {/* <SpinnerOverlay show={loadingSuggestionIndex === 0}>
+            <Spinner />
+          </SpinnerOverlay> */}
+        </QuestionItem>
+      )}
+
+      {/* Question History Section */}
+      {questionHistory.length > 0 &&
+        questionHistory.map((historyQuestion, index) => {
+          // Calculate the adjusted index for history items (after current question)
+          const historyStartIndex = 1; // Right after current question
+          const adjustedIndex = historyStartIndex + index;
+          const isCurrentlyLoading = loadingSuggestionIndex === adjustedIndex;
+          const isAnyLoading = loadingSuggestionIndex !== null;
+          const shouldBeDisabled = isAnyLoading && !isCurrentlyLoading;
+          const isSelected = selectedQuestionIndex === adjustedIndex;
+
+          return (
+            <QuestionItem
+              key={`history-${index}`}
+              onClick={() => handleHistoryQuestionClick(historyQuestion, index)}
+              disabled={shouldBeDisabled}
+              selected={isSelected}
+            >
+              <QuestionText isLoading={isCurrentlyLoading}>
+                {historyQuestion}
+              </QuestionText>
+              {/* <SpinnerOverlay show={isCurrentlyLoading}>
+                <Spinner />
+              </SpinnerOverlay> */}
+            </QuestionItem>
+          );
+        })}
+
       {/* Suggested Questions Section */}
       {suggestedQuestionsLoading && (
         <SpinnerWithMargin>
@@ -293,16 +534,18 @@ function QuestionProcessor() {
         !suggestedQuestionsError &&
         suggestedQuestions.length > 0 &&
         suggestedQuestions.map((suggestedQuestion, index) => {
-          const isCurrentlyLoading = loadingSuggestionIndex === index;
+          // Adjust index to account for current question (0) and history questions (1+)
+          const adjustedIndex = questionHistory.length + 1 + index;
+          const isCurrentlyLoading = loadingSuggestionIndex === adjustedIndex;
           const isAnyLoading = loadingSuggestionIndex !== null;
           const shouldBeDisabled = isAnyLoading && !isCurrentlyLoading;
-          const isSelected = selectedQuestionIndex === index;
+          const isSelected = selectedQuestionIndex === adjustedIndex;
 
           return (
             <QuestionItem
-              key={index}
+              key={adjustedIndex}
               onClick={() =>
-                handleSuggestedQuestionClick(suggestedQuestion, index)
+                handleSuggestedQuestionClick(suggestedQuestion, adjustedIndex)
               }
               disabled={shouldBeDisabled}
               selected={isSelected}

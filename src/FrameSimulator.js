@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 
 const Page = styled.div`
@@ -23,7 +23,9 @@ const DigitContainer = styled.div`
   height: 180px;
 `;
 
-const Segment = styled.div`
+const Segment = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== "active"
+})`
   position: absolute;
   background-color: ${(props) => (props.active ? "#ff0000" : "#1a0000")};
   box-shadow: ${(props) => (props.active ? "0 0 10px #ff0000" : "none")};
@@ -92,6 +94,33 @@ const Segment = styled.div`
 function FrameSimulator() {
   const [currentNumber, setCurrentNumber] = useState("    ");
 
+  const getServerUrl = () => {
+    let serverUrl = process.env.REACT_APP_SERVER_URL;
+    if (serverUrl && !serverUrl.startsWith("http")) {
+      const protocol = serverUrl.includes("localhost") ? "http" : "https";
+      serverUrl = `${protocol}://${serverUrl}`;
+    }
+    return serverUrl;
+  };
+
+  const fetchCurrentQuestion = useCallback(async () => {
+    try {
+      const serverUrl = getServerUrl();
+      const res = await fetch(`${serverUrl}/get-current-question`);
+
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      if (data.success && data.number !== undefined) {
+        setCurrentNumber(formatNumber(data.number));
+      }
+    } catch (err) {
+      // Silently handle fetch errors
+    }
+  }, []);
+
   // Segment patterns for each digit (a, b, c, d, e, f, g)
   // a=top, b=top-right, c=bottom-right, d=bottom, e=bottom-left, f=top-left, g=middle
   const digitSegments = {
@@ -150,6 +179,9 @@ function FrameSimulator() {
   };
 
   useEffect(() => {
+    // Fetch current question/answer on load
+    fetchCurrentQuestion();
+
     // Connect to the WebSocket server
     const serverUrl = process.env.REACT_APP_SERVER_URL;
 
@@ -169,36 +201,41 @@ function FrameSimulator() {
     const websocket = new WebSocket(websocketUrl);
 
     websocket.onopen = () => {
-      console.log("Connected to WebSocket server");
+      // Connected to WebSocket server
     };
 
-    websocket.onclose = () => {
-      console.log("Disconnected from WebSocket server");
+    websocket.onclose = (event) => {
+      // If the connection was closed by the server (not by us), attempt to reconnect
+      if (event.code !== 1000 && event.code !== 1001) {
+        setTimeout(() => {
+          // Create new connection by triggering this useEffect again would require state change
+          // For now, just handle that we detected an unexpected disconnection
+        }, 3000);
+      }
     };
 
     websocket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("Received WebSocket message:", data);
 
         // Handle different message types
         if (data.type === "number-update" && data.number !== undefined) {
           setCurrentNumber(formatNumber(data.number));
         }
       } catch (error) {
-        console.error("Error parsing WebSocket message:", error);
+        // Silently handle WebSocket message parsing errors
       }
     };
 
     websocket.onerror = (error) => {
-      console.error("WebSocket connection error:", error);
+      // Silently handle WebSocket connection errors
     };
 
     // Cleanup on unmount
     return () => {
       websocket.close();
     };
-  }, []);
+  }, [fetchCurrentQuestion]);
 
   return (
     <Page>
