@@ -63,7 +63,7 @@ const QuestionItem = styled.button`
   @media (hover: hover) {
     &:hover {
       background-color: ${(props) => {
-        if (props.disabled) return "rgba(255, 255, 255, 0.1)";
+        // if (props.disabled) return "rgba(255, 255, 255, 0.1)";
         if (props.selected) return "rgba(255, 255, 255, 0.4)";
         return "rgba(255, 255, 255, 0.2)";
       }};
@@ -72,7 +72,7 @@ const QuestionItem = styled.button`
 
   &:active {
     background-color: ${(props) => {
-      if (props.disabled) return "rgba(255, 255, 255, 0.1)";
+      // if (props.disabled) return "rgba(255, 255, 255, 0.1)";
       if (props.selected) return "rgba(255, 255, 255, 0.4)";
       return "rgba(255, 255, 255, 0.4)";
     }};
