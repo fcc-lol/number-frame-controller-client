@@ -263,6 +263,14 @@ function QuestionProcessor() {
               const shouldUpdateCurrent = prev === null || prev === 0;
 
               if (shouldUpdateCurrent) {
+                // Remove the last question from the entire list (last suggested question)
+                setSuggestedQuestions((prevSuggested) => {
+                  if (prevSuggested.length > 0) {
+                    return prevSuggested.slice(0, -1);
+                  }
+                  return prevSuggested;
+                });
+
                 // Add the existing current question to history before replacing it
                 setCurrentQuestion((currentQ) => {
                   if (
@@ -281,7 +289,8 @@ function QuestionProcessor() {
                         return prevHistory;
                       }
                       // Add previous current question to the beginning of history
-                      return [currentQ.question, ...prevHistory];
+                      const newHistory = [currentQ.question, ...prevHistory];
+                      return newHistory;
                     });
                   }
 
