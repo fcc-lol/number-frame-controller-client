@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
-import { io } from "socket.io-client";
 
 const Page = styled.div`
   display: flex;
@@ -151,43 +150,53 @@ function FrameSimulator() {
   };
 
   useEffect(() => {
-    // Connect to the socket server
+    // Connect to the WebSocket server
     const serverUrl = process.env.REACT_APP_SERVER_URL;
 
-    // Add protocol prefix if not present
-    let socketUrl = serverUrl;
-    if (!socketUrl.startsWith("http://") && !socketUrl.startsWith("https://")) {
-      // Use http for localhost, https for everything else
-      const protocol = socketUrl.includes("localhost") ? "http://" : "https://";
-      socketUrl = protocol + socketUrl;
+    // Convert HTTP URL to WebSocket URL
+    let websocketUrl = serverUrl;
+    if (
+      !websocketUrl.startsWith("ws://") &&
+      !websocketUrl.startsWith("wss://")
+    ) {
+      // Remove any existing http/https prefix
+      websocketUrl = websocketUrl.replace(/^https?:\/\//, "");
+      // Use wss for production, ws for localhost
+      const protocol = websocketUrl.includes("localhost") ? "ws://" : "wss://";
+      websocketUrl = protocol + websocketUrl;
     }
 
-    const newSocket = io(socketUrl, {
-      transports: ["websocket", "polling"]
-    });
+    const websocket = new WebSocket(websocketUrl);
 
-    newSocket.on("connect", () => {
-      console.log("Connected to socket server");
-    });
+    websocket.onopen = () => {
+      console.log("Connected to WebSocket server");
+    };
 
-    newSocket.on("disconnect", () => {
-      console.log("Disconnected from socket server");
-    });
+    websocket.onclose = () => {
+      console.log("Disconnected from WebSocket server");
+    };
 
-    newSocket.on("number-update", (data) => {
-      console.log("Received number update:", data);
-      if (data && data.number !== undefined) {
-        setCurrentNumber(formatNumber(data.number));
+    websocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("Received WebSocket message:", data);
+
+        // Handle different message types
+        if (data.type === "number-update" && data.number !== undefined) {
+          setCurrentNumber(formatNumber(data.number));
+        }
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
       }
-    });
+    };
 
-    newSocket.on("connect_error", (error) => {
-      console.error("Socket connection error:", error);
-    });
+    websocket.onerror = (error) => {
+      console.error("WebSocket connection error:", error);
+    };
 
     // Cleanup on unmount
     return () => {
-      newSocket.close();
+      websocket.close();
     };
   }, []);
 
