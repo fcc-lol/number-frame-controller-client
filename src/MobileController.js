@@ -86,6 +86,7 @@ const QuestionText = styled.span.withConfig({
   transition: opacity 0.2s ease;
 `;
 
+// eslint-disable-next-line no-unused-vars
 const SpinnerOverlay = styled.div.withConfig({
   shouldForwardProp: (prop) => prop !== "show"
 })`
@@ -553,9 +554,9 @@ function QuestionProcessor() {
               <QuestionText isLoading={isCurrentlyLoading}>
                 {suggestedQuestion}
               </QuestionText>
-              <SpinnerOverlay show={isCurrentlyLoading}>
+              {/* <SpinnerOverlay show={isCurrentlyLoading}>
                 <Spinner />
-              </SpinnerOverlay>
+              </SpinnerOverlay> */}
             </QuestionItem>
           );
         })}
