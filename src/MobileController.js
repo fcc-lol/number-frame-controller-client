@@ -38,10 +38,14 @@ const TextInput = styled.textarea`
     outline: none;
   }
 
-  // &:disabled {
-  //   background-color: rgba(255, 255, 255, 0.05);
-  //   color: rgba(255, 255, 255, 0.1);
-  // }
+  &:disabled {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 1);
+    opacity: 1;
+    -webkit-opacity: 1;
+    -webkit-text-fill-color: rgba(255, 255, 255, 1);
+    -webkit-appearance: none;
+  }
 `;
 
 const QuestionItem = styled.button`
