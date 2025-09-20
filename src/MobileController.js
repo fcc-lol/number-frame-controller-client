@@ -45,6 +45,13 @@ const TextInput = styled.textarea`
     -webkit-opacity: 1;
     -webkit-text-fill-color: rgba(255, 255, 255, 1);
     -webkit-appearance: none;
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+      font-weight: 400;
+      opacity: 1;
+      -webkit-text-fill-color: rgba(255, 255, 255, 0.5);
+    }
   }
 `;
 
